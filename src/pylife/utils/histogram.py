@@ -131,6 +131,66 @@ def combine_histogram(hist_list, method='sum'):
     return combined
 
 
+def histogram_stack(histogram, column_level):
+    """Stack a 2D histogram into a plain 2D :class:`numpy.ndarray`.
+
+    This is convenient if you want to feed a 2D histogram into a plotting
+    function like :func:`matplotlib.pyplot.imshow`,
+    :func:`matplotlib.pyplot.hist2d` or :func:`plotly.express.imshow`, which
+    expect a rectangular grid of values rather than a :class:`pandas.Series`
+    with a :class:`pandas.MultiIndex`.
+
+    Parameters
+    ----------
+    histogram : :class:`pandas.Series`
+        A 2D histogram, i.e. a series whose index is a two level
+        :class:`pandas.MultiIndex` of which both levels are
+        :class:`pandas.IntervalIndex`.
+
+    column_level : str
+        The name of the index level that is put into the columns of the
+        resulting array. The remaining level ends up in the rows.
+
+    Returns
+    -------
+    stacked : :class:`numpy.ndarray`
+        A 2D array of shape ``(rows, columns)``.  Bin combinations that are
+        not present in ``histogram`` are filled with ``0.0``.
+
+    Raises
+    ------
+    ValueError
+        if ``histogram`` does not have a two level :class:`pandas.MultiIndex`
+        or if ``column_level`` is not one of the index level names.
+
+    Notes
+    -----
+    Bin combinations missing from ``histogram`` are treated as ``0.0``, not
+    as missing data.  This is consistent with the default behavior of
+    :func:`~pylife.utils.histogram.rebin_histogram`.
+
+    Examples
+    --------
+    >>> index = pd.MultiIndex.from_tuples(
+    ...     [(pd.Interval(0, 1), pd.Interval(0, 1)), (pd.Interval(1, 2), pd.Interval(1, 2))],
+    ...     names=['range', 'mean'],
+    ... )
+    >>> h = pd.Series([5.0, 10.0], index=index)
+    >>> histogram_stack(h, column_level='mean')
+    array([[ 5.,  0.],
+           [ 0., 10.]])
+    """
+    if not isinstance(histogram.index, pd.MultiIndex) or histogram.index.nlevels != 2:
+        raise ValueError("histogram_stack() only works for a histogram with a two level MultiIndex.")
+
+    if column_level not in histogram.index.names:
+        raise ValueError(
+            f"column_level '{column_level}' not found in histogram index levels {list(histogram.index.names)}."
+        )
+
+    return histogram.unstack(column_level).fillna(0.0).to_numpy()
+
+
 def rebin_histogram(histogram, binning, nan_default=False):
     """Rebin a histogram to a given binning.
 
